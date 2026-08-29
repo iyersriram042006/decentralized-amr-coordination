@@ -1,0 +1,141 @@
+{
+  "theme": "dark",
+  "project_type": "hybrid_fullstack",
+  "emotion_and_vibe": "High-tech mission-control, industrial precision, cyberpunk undertones. It should feel like a real-time, professional robotic fleet command center.",
+  "typography": {
+    "headings": {
+      "font": "JetBrains Mono",
+      "style": "tracking-tight uppercase",
+      "weights": ["font-medium", "font-bold"],
+      "usage": "Use for all main headers, section titles, and widget headers."
+    },
+    "body": {
+      "font": "IBM Plex Sans",
+      "style": "leading-relaxed tracking-normal",
+      "weights": ["font-normal", "font-medium"],
+      "usage": "Use for descriptions, standard text, and documentation."
+    },
+    "data_points": {
+      "font": "JetBrains Mono",
+      "style": "tracking-wider",
+      "weights": ["font-light", "font-bold"],
+      "usage": "Use for logs, metrics, coordinates, time indicators, and algorithm outputs."
+    }
+  },
+  "colors": {
+    "background": {
+      "base": "#050505",
+      "panel": "#0A0B10",
+      "panel_hover": "#13151D"
+    },
+    "text": {
+      "primary": "#F3F4F6",
+      "secondary": "#9CA3AF",
+      "muted": "#4B5563"
+    },
+    "borders": {
+      "default": "#1F2937",
+      "light": "#374151"
+    },
+    "accents": {
+      "cyan_active": "#00E5FF",
+      "green_success": "#39FF14",
+      "orange_warning": "#FF6D00",
+      "red_critical": "#FF003C",
+      "purple_ai": "#B026FF"
+    },
+    "status": {
+      "moving": "#00E5FF",
+      "idle": "#4B5563",
+      "deadlock": "#FF003C",
+      "blocked": "#FF6D00",
+      "reallocating": "#B026FF",
+      "task_manager": "#39FF14"
+    }
+  },
+  "visual_enhancers": {
+    "surfaces": {
+      "panels": "Flat solid dark backgrounds (#0A0B10) with sharp 1px borders (#1F2937). Avoid heavy shadows in dark mode; use borders to establish hierarchy. Add 2px inner glow highlights for 'active' panels.",
+      "glass": "For sticky headers or floating overlays: bg-black/60 with backdrop-blur-xl and a border-white/10.",
+      "grid_lines": "Subtle #1F2937 grid lines on the background to enhance the technical 'blueprint' feel."
+    },
+    "textures": {
+      "noise": "Optional subtle noise overlay on the hero section to kill digital flatness.",
+      "glow": "Apply drop-shadow-[0_0_8px_currentColor] on critical accent text or active nodes to create a neon bleed effect."
+    }
+  },
+  "grids_and_layouts": {
+    "dashboard_grid": {
+      "strategy": "High Density Grid (Mode B)",
+      "base_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 or 12-column complex bento layout.",
+      "gap": "gap-4 or gap-6",
+      "rules": "Every pixel must be utilized. Use h-full on children. No jagged bottoms."
+    },
+    "spacing": "Use precise, mathematical spacing (p-4, p-6). Avoid massive whitespace in the dashboard view; keep it dense but clearly separated by 1px borders.",
+    "alignment": "Left-align dense data, logs, and forms. Center-align main hero text."
+  },
+  "motion_and_interactions": {
+    "transitions": "Use specific transitions: transition-colors duration-200, transition-transform duration-150. NEVER use 'transition-all'.",
+    "hover_states": "Hovering over a panel should slightly lighten its background and border. Buttons should have distinct hover states with increased text contrast.",
+    "simulation_motion": "AMR movements in the grid should be animated smoothly using CSS transitions or Framer Motion between cell coordinates.",
+    "micro_interactions": "Blinking cursors for logs, pulse animations for critical warnings (red/orange statuses)."
+  },
+  "components": {
+    "simulation_grid": "A 2D cell matrix representing the warehouse. Use CSS Grid or HTML Canvas. Each cell shows obstacles, racks, and AMR positions. AMRs should be distinct circles/icons with glowing borders based on state.",
+    "control_bar": "Fixed or sticky panel with Play/Pause, Step, Reset buttons, Speed Slider, and Tick Counter.",
+    "event_log": "A scrolling terminal-like window. Uses JetBrains Mono. Color-code log lines based on event type (e.g., [CRITICAL], [INFO]).",
+    "cards": "Cardless style. Rectangular dense blocks with strict borders. No border radius (rounded-none or max rounded-sm).",
+    "charts": "Recharts for Baseline vs System performance. Dark theme, remove default Cartesian grid lines, use single distinct accent colors."
+  },
+  "media": {
+    "images": [
+      {
+        "url": "https://images.unsplash.com/photo-1701313056413-0915e1adf204?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwzfHxhdXRvbm9tb3VzJTIwd2FyZWhvdXNlJTIwcm9ib3RzfGVufDB8fHx8MTc4ODAzMDY2Mnww&ixlib=rb-4.1.0&q=85",
+        "description": "Industrial warehouse robot background",
+        "usage": "Hero section background with a heavy dark gradient overlay (bg-black/80 to bg-black/60) to ensure text readability."
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1718844054447-42759fd577e5?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1ODR8MHwxfHNlYXJjaHwyfHxkYXJrJTIwdGVjaCUyMGdyaWQlMjBhYnN0cmFjdCUyMGJhY2tncm91bmR8ZW58MHx8fHwxNzg4MDMwNjY3fDA&ixlib=rb-4.1.0&q=85",
+        "description": "Abstract dark tech grid",
+        "usage": "Texture overlay or section background for the simulation area."
+      }
+    ],
+    "icons": "Use 'lucide-react' for all UI icons (play, pause, settings, warning, battery)."
+  },
+  "libraries": {
+    "required": [
+      "framer-motion",
+      "recharts",
+      "lucide-react",
+      "clsx",
+      "tailwind-merge"
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure minimum 4.5:1 ratio. Muted text should be at least #9CA3AF on #050505.",
+    "testing": "All interactive and key informational elements MUST include a data-testid attribute (e.g., data-testid='play-simulation-btn')."
+  },
+  "instructions_to_main_agent": [
+    "Build a complete multi-page or deep single-page application using React and Tailwind CSS. The file extensions must be .js or .jsx, NOT .tsx.",
+    "Create a Landing Page Hero introducing SIH Problem 26123, then transition seamlessly into the Dashboard.",
+    "The Dashboard must include a live warehouse simulation grid where users can place robots, obstacles, and assign parameters.",
+    "Include a 'Scenario Selector' to trigger specific algorithms (Collision, Deadlock, Reroute, Battery-dead, Task Manager election).",
+    "Implement the 'Event Log' terminal with auto-scrolling to display real-time algorithm decisions.",
+    "Use Recharts to build the performance comparison chart.",
+    "Follow the exact dark theme palette provided. Use absolute black/dark navy, NOT gray.",
+    "Avoid using generic Shadcn cards with large padding. Use tight, border-bound dense layouts.",
+    "Ensure all data_testids are implemented as per rules."
+  ],
+  "GENERAL UI UX DESIGN GUIDELINES": [
+    "You tend to converge toward generic, 'on distribution' outputs. In frontend design, this creates what users call the 'AI slop' aesthetic. Avoid this: make creative, distinctive frontends that surprise and delight.",
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients.",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy and 1px sharp borders.",
+    "You MUST NOT apply universal transition (e.g. transition: all). Always add transitions for specific properties.",
+    "You MUST NOT center align the app container, i.e., do not add '.App { text-align: center; }'.",
+    "NEVER use AI assistant Emoji characters like 🤖🧠💭💡🔮🎯 for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, selection states.",
+    "Prioritize using pre-existing components when applicable. Create new components matching the style of the project.",
+    "Use Sonner for toasts."
+  ]
+}
