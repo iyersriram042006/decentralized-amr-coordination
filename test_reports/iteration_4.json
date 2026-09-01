@@ -1,0 +1,23 @@
+{
+  "summary": "Verified the conflict/deadlock recount-cooldown fix (CONFLICT_RECOUNT_COOLDOWN_TICKS=20) on /dashboard. Head-On Collision: counts stayed FLAT at deadlock=1, collision=1 across ticks 24->243 during the sustained standoff. Choke-Point Convergence: flat at deadlock=2, collision=5 from tick 30->242. Free Operation at 20 t/s: deadlock 3/8/22/36/51 at ticks 100/301/692/1092/1493 - exactly matching the headless reference (~51 @1500, previously ~252); collisions grew to 68. Light regression passed: detection still fires (event log shows DEADLOCK 'Cycle [R2 -> R3] ... steps aside' and COLLISION 'R1 yields to R4 (TTC 2.0 ticks)'), indicator cards filter the log on click (chip 'DEADLOCK RESOLUTION x' shown, only deadlock rows listed), play/pause/step (00035->00036)/reset (tick 00000, counters zeroed) work, Run Comparison at 30 trials returned a dynamic measured +39.7% (baseline 544t vs system 328t, seed 154562, >=20% target met), battery healthy after 1500 ticks (3 NORMAL / 1 LOW / 0 DEAD - iteration_3 charging fix holds), GridLock branding intact, no console errors. Backend pytest suite 10/10 passed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "engine.js _recordCollision/_resolveDeadlock refresh the seen-map timestamp on every active tick, so a continuously active standoff never re-counts until it is genuinely clear for >20 ticks - matches the intended semantics; note the maps grow unbounded over very long runs (minor memory nit, not a bug for demo lengths).",
+    "Minor UX: RESET reverts the scenario selection back to Free Operation instead of keeping the currently selected scenario - verify this is intentional."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "N/A - public app, no auth",
+  "context_for_next_testing_agent": "Testids: play-simulation-btn / step-simulation-btn / reset-simulation-btn (not play-button), tick-counter, indicator-deadlock/collision/blocked/realloc, scenario-<id>, speed-slider (focus + ArrowRight, 12 presses -> 20 t/s), perf-trials-select, run-comparison-btn, event-log, performance-panel. Deadlock counting cooldown verified working; no open issues this round.",
+  "rca_of_the_issue": "Previous inflation came from single-tick gating (_activeCollisions/_activeDeadlocks) which recounted a standoff that reformed ~2 ticks after step-aside. New Map-based 20-tick cooldown keyed by sorted pair/cycle id fixes it; confirmed on-screen counts now match headless reference."
+}

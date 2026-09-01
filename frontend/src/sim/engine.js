@@ -29,6 +29,11 @@ export const CONFIG = {
   ACK_TIMEOUT_TICKS: 4,
   ACK_MAX_RETRIES: 1,
 
+  // a conflict between the same robots/cycle counts again only after they have
+  // been clear for at least this many ticks (prevents re-counting an ongoing
+  // standoff that our own step-aside resolution briefly breaks and reforms)
+  CONFLICT_RECOUNT_COOLDOWN_TICKS: 20,
+
   MIN_FLEET_SIZE: 3,
 };
 
@@ -138,6 +143,8 @@ export class SimulationEngine {
     this.tickIndicators = { collision: false, deadlock: false, blocked: false, reallocation: false };
     this._activeCollisions = new Set();
     this._activeDeadlocks = new Set();
+    this._collisionSeen = new Map(); // pair key -> last tick counted/seen
+    this._deadlockSeen = new Map(); // cycle key -> last tick counted/seen
     this.completionTicks = [];
 
     // robots
@@ -877,10 +884,6 @@ export class SimulationEngine {
     // waiting on a cell occupied by another waiting robot)
     this._detectDeadlock(desired, intents, occupancy);
 
-    // remember which pairs are in conflict this tick so the SAME standoff is not
-    // recounted next tick (episode-based counting)
-    this._activeCollisions = yieldedPairs;
-
     // apply moves
     for (const r of this.robots) {
       if (!r.alive) continue;
@@ -921,11 +924,13 @@ export class SimulationEngine {
     if (!loser || !winner) return;
     if (this.mode === "baseline") loser._baselineHold = 2; // naive extra wait
     const pk = [loser.robot_id, winner.robot_id].sort().join("|");
-    if (seen.has(pk)) return;
+    if (seen.has(pk)) return; // once per tick per pair
     seen.add(pk);
     this.tickIndicators.collision = true; // pulse every active tick
-    // count one EPISODE: only when this pair was NOT already in conflict last tick
-    if (this._activeCollisions.has(pk)) return;
+    // one EPISODE per pair: recount only after a cooldown of being clear
+    const last = this._collisionSeen.get(pk);
+    this._collisionSeen.set(pk, this.tick);
+    if (last !== undefined && this.tick - last <= CONFIG.CONFLICT_RECOUNT_COOLDOWN_TICKS) return;
     this.metrics.collisionsAvoided += 1;
     this.indicators.collision += 1;
     this._emit("Collision", { robot_a: loser.robot_id, robot_b: winner.robot_id, ttc: ttc === Infinity ? null : Number(ttc.toFixed(1)), resolution });
@@ -937,7 +942,6 @@ export class SimulationEngine {
   }
 
   _detectDeadlock(desired, intents, occupancy) {
-    this._deadlockThisTick = new Set();
     // wait-for edges: r -> occupant of desired[r], only for robots that did not get to move
     const waitFor = new Map();
     for (const [id, cell] of desired) {
@@ -966,15 +970,16 @@ export class SimulationEngine {
       }
       for (const n of stack) visited.add(n);
     }
-    // episode-based: only cycles genuinely new this tick stay counted next tick
-    this._activeDeadlocks = this._deadlockThisTick;
   }
 
   _resolveDeadlock(cycle) {
     if (cycle.length < 2) return;
     const cycleKey = [...cycle].sort().join("|");
-    this._deadlockThisTick.add(cycleKey);
-    const isNew = !this._activeDeadlocks.has(cycleKey);
+    // one EPISODE per cycle: recount only after a cooldown of being clear (our
+    // step-aside briefly breaks the cycle and it can reform a couple ticks later)
+    const last = this._deadlockSeen.get(cycleKey);
+    const isNew = last === undefined || this.tick - last > CONFIG.CONFLICT_RECOUNT_COOLDOWN_TICKS;
+    this._deadlockSeen.set(cycleKey, this.tick);
     if (isNew) {
       this.metrics.deadlocksResolved += 1;
       this.indicators.deadlock += 1;
