@@ -1,0 +1,18 @@
+{
+  "summary": "Focused test of the NEW 'Stop-and-Wait vs GridLock Performance' dashboard section plus light regression. Backend pytest 10/10 passed. New section renders with correct title, trials Select (10/20/30/50), and Run Comparison button. With 30 trials it computed and displayed all four tiles; Stop-and-Wait Avg > GridLock Avg and improvement matched (baseline-system)/baseline*100 exactly on both runs. Two consecutive runs produced different base seeds and different measured values (Run1: 650t vs 309.2t = +52.4%, seed 819852; Run2: 539.3t vs 365.7t = +32.2%, seed 717603) proving the % is measured, not hard-coded. Persistence verified: GET /api/sim-runs count 38 -> 39 -> 40 after the two runs. Regression: existing performance-panel run-comparison still works (+38.6%, seed 652673, chart rendered), play/step/reset advance and reset the tick counter, scenario loading (Bulk Hungarian Assignment) injects tasks and footer metrics update, indicator cards / roster / event log / battery+TM panels / GridLock branding all present. Zero console errors across all sessions.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": { "ui_bugs": [], "integration_issues": [], "design_issues": [] },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "StopWaitComparison.jsx: the axios POST to /api/sim-runs is wrapped in an empty catch (best-effort). A persistence failure is silently invisible to the user; consider a small non-blocking 'not saved' indicator.",
+    "StopWaitComparison.jsx: the 30/50-trial run blocks the main thread (synchronous runComparison in setTimeout), so the UI freezes for ~5-10s. Acceptable for a demo, but a Web Worker would keep the dashboard responsive."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "100%", "frontend": "100%" },
+  "seed_data_creation": "2 sim-run records created by the new section during UI runs + pytest TEST_ demo-request/sim-run fixtures.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Panel titles render UPPERCASE via CSS text-transform, so compare title text case-insensitively. Control bar testids are play-simulation-btn / step-simulation-btn / reset-simulation-btn / tick-counter / speed-slider (not play-pause-btn). Do NOT call external APIs with urllib from the Playwright sandbox (403); use page.request.get instead. Radix Select: click [data-testid=stopwait-trials-select] then [role=option] with exact regex text. A 30-trial run takes ~6-10s; wait for [data-testid=stopwait-metrics].",
+  "rca_of_the_issue": "No product defects found. The only initial test failures were test-script artifacts: CSS uppercase title text and a 403 on urllib egress from the browser sandbox; both fixed in the test script."
+}

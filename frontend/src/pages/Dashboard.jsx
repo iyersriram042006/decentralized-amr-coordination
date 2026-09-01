@@ -8,6 +8,7 @@ import RobotRoster from "@/components/sim/RobotRoster";
 import EventLog from "@/components/sim/EventLog";
 import { TaskManagerPanel, BatteryPanel, FooterMetrics } from "@/components/sim/SidePanels";
 import PerformancePanel from "@/components/sim/PerformancePanel";
+import StopWaitComparison from "@/components/sim/StopWaitComparison";
 import AdminControls from "@/components/sim/AdminControls";
 import { Panel } from "@/components/sim/Panel";
 import { STATUS_COLOR, BATTERY_COLOR } from "@/components/sim/theme";
@@ -115,6 +116,8 @@ export default function Dashboard() {
             <PerformancePanel seed={42} />
           </div>
         </div>
+
+        <StopWaitComparison />
 
         <FooterMetrics snapshot={snapshot} />
       </div>
