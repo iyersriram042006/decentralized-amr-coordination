@@ -1,0 +1,42 @@
+{
+  "summary": "Focused retest of the battery/charging fix + light regression. PRIMARY RETEST PASS: /dashboard Free Operation at 20 t/s ran 1500+ ticks (75s wall) and the fleet NEVER died - Battery Overview DEAD count was 0 at every one of 15 polls (timeline [0]*15); robots cycled NORMAL -> LOW/CRITICAL -> charging -> back to service continuously (38 'fully charged, back to service' observations across R1-R4). DISTINCT charging cells confirmed: routing events observed were R1->[5,17]/[7,17], R2->[5,17]/[6,17], R3->[7,17], R4->[6,17] - no longer all converging on one cell. CHARGE-ONLY-AT-CHARGER PASS: tick-by-tick step trace of R3 from (16,15) showed battery flat/declining 14->13 while routing through (14,15)...(7,16), then rising exactly 6%/tick only at (7,17) up to 100% then status -> idle; zero mid-aisle charge. target-R3 highlight marker rendered for the charging target. Battery states PASS (thresholds b<=0 DEAD, <10 CRITICAL, <20 LOW, else NORMAL; the '20% shown as LOW' sample is a toFixed rounding artifact). kill-R2 -> status 'error', 0%, DEAD count 1, toast 'R2 battery killed'; recover-R2 -> idle 100%. REGRESSION (light) PASS: page title 'GridLock . Decentralized AMR Fleet Coordination', landing nav+footer and dashboard header read GRIDLOCK with no AMR-FLEET, 4 landing hero target markers; Run Comparison at 30 trials twice gave dynamic distinct results (seed 10131 -> +26.9% baseline 469.6t / system 343.2t; seed 205879 -> +35.8% 502.8t / 323t) with baseline_avg > system_avg, and GET /api/sim-runs went 15 -> 17 with matching rows; step (+1) and reset (->0) work; choke_point and default scenarios load. BACKEND: pytest 10/10 PASS.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/demo-requests", "issue": "email is still a plain str (no EmailStr validation) and create returns 200 not 201 - accepted per scope."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RobotRoster status label", "issue": "LOW: a robot merely ROUTING to a charger already shows status 'charging' (observed R3 'charging' at (14,15) while battery was still dropping). Consider a distinct 'to-charger'/'returning' label so operators don't think it is charging mid-aisle.", "selector": "[data-testid=\"robot-roster\"]", "priority": "LOW"},
+      {"component": "EventLog rows", "issue": "LOW/testability (unchanged from iteration_2): individual log lines still have no data-testid, so per-row assertions are impossible; log content had to be scraped from the panel inner_text.", "selector": "[data-testid=\"event-log\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard - battery economy", "issues": ["Duty cycle is very short: with MOVE_BATTERY_COST 0.35 a robot goes 100% -> ~10% in roughly 200-250 ticks, so each of the 4 robots made ~9 full charge trips in 1500 ticks and the fleet spends a large share of time driving to/at the charging row. Safe now, but for the demo narrative consider a larger battery capacity / slower drain so throughput is not dominated by charging."]},
+      {"screen": "Dashboard - Deadlock Resolution indicator (observation, NOT re-verified deeply)", "issues": ["Free Operation at 20 t/s reached DEADLOCK RESOLUTION 252 vs COLLISION AVOIDANCE 113 by tick 1511, and the visible log showed 'Cycle [R1 -> R2] detected - R2 steps aside & reroutes' at ticks 1482 and 1484 (2 ticks apart). Per-episode counting was verified PASS in choke_point (iteration_2); worth a sanity check that repeated same-pair cycles in Free Operation are genuinely new episodes and not near-per-tick re-counting."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/backend_test.py", "/app/test_reports/pytest/pytest_results.xml"],
+  "action_items": [
+    "NO blocking action: the HIGH fleet-wide battery-death bug from iteration_2 is FIXED and verified (0 DEAD over 1500 ticks, distinct charger assignment, charge only at y=17).",
+    "OPTIONAL LOW: rename the en-route charging status in the roster (or add a 'to charger' sub-state).",
+    "OPTIONAL LOW: add data-testid to event-log rows.",
+    "OPTIONAL: sanity-check deadlock indicator episode counting under Free Operation (252 in 1511 ticks).",
+    "OPTIONAL: engine.js is 1288 lines - still over the 700-line guideline; split battery/charging, collision/deadlock, pathfinding, allocation."
+  ],
+  "critical_code_review_comments": [
+    "engine.js:696 _nearestCharging() now builds a 'taken' set from live _chargingTarget + occupancy and falls back to the nearest contended cell - correct fix; note the fallback can still double-assign if #CRITICAL robots > #charging cells (fleet of 4 vs bottom-row chargers is safe today, but scaling the fleet could regress this).",
+    "engine.js:892/898 near-zero drain while status===CHARGING (0.05 moving / 0 waiting) guarantees arrival; behaviourally correct but it means a committed robot is effectively immune to dying, which slightly weakens the 'battery dead mid-task' demo realism outside the explicit battery_dead scenario / killBattery.",
+    "engine.js:681 LOW+idle opportunistic top-up is a good addition; consider making the CRITICAL trigger distance-aware (battery < cost_to_charger * safety) so long-haul tasks cannot start on a marginal charge.",
+    "PerformancePanel.run() still swallows the /api/sim-runs POST error (empty catch) - a backend outage remains invisible to the operator."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100% of retested items (primary battery/charging retest + all light regression checks passed)"},
+  "seed_data_creation": "2 real sim-run rows persisted by the UI (seeds 10131 and 205879, 30 trials) plus TEST_ rows from the pytest suite.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "N/A - public app, no auth.",
+  "context_for_next_testing_agent": "Backend: cd /app && python -m pytest backend/tests/backend_test.py -v (10/10). GOTCHAS: play/step/reset testids are play-simulation-btn / step-simulation-btn / reset-simulation-btn (NOT play-btn). Speed slider: click [data-testid=speed-slider] then ~25-30 ArrowRight to hit 20 t/s. perf-trials-select and roster-status-filter are Radix Selects. Scenario ids include 'default', 'choke_point', 'dead_zone'. Event-log rows have no testid - scrape [data-testid=event-log] inner_text. Roster row format 'Rn <tab> x,y <tab> status <tab> nn%'. VERIFIED PASS in iteration_3 (no need to redo): battery/charging fix (0 deaths over 1500 ticks, distinct chargers, charge only at y=17, kill/recover), Run Comparison dynamic + /api/sim-runs persistence, title/branding, step/reset, scenario load, target markers. Remaining open items are all LOW/optional (roster 'charging' label while en route, event-log testids, deadlock episode counting sanity check, engine.js file size).",
+  "rca_of_the_issue": "Iteration_2's fleet-wide death was caused by stateless _nearestCharging() (all CRITICAL robots got the same cell), WAIT_BATTERY_COST draining while stalled, and dead robots becoming obstacles on the charging approach. The fix addresses all three vectors: reservation-aware charger selection (taken set of live _chargingTarget + occupied charging cells, nearest-free preferred), near-zero drain once status===CHARGING (0.05 moving / 0 waiting), a LOW+idle opportunistic top-up branch, and MOVE_BATTERY_COST reduced 0.55 -> 0.35. Empirically confirmed in the browser: 1500+ ticks at 20 t/s with DEAD=0 at every poll and continuous full-charge cycles."
+}

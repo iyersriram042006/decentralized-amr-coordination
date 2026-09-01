@@ -7,7 +7,7 @@ import { hungarian } from "./hungarian";
 export const CONFIG = {
   BATTERY_LOW_THRESHOLD: 20,
   BATTERY_CRITICAL_THRESHOLD: 10,
-  MOVE_BATTERY_COST: 0.55,
+  MOVE_BATTERY_COST: 0.35,
   WAIT_BATTERY_COST: 0.15,
   IDLE_BATTERY_COST: 0.08,
   CHARGE_RATE: 6,
@@ -136,6 +136,8 @@ export class SimulationEngine {
     };
     this.indicators = { collision: 0, deadlock: 0, blocked: 0, reallocation: 0 };
     this.tickIndicators = { collision: false, deadlock: false, blocked: false, reallocation: false };
+    this._activeCollisions = new Set();
+    this._activeDeadlocks = new Set();
     this.completionTicks = [];
 
     // robots
@@ -666,8 +668,22 @@ export class SimulationEngine {
       delete this.channel[robot.robot_id];
       this._log("Battery", `${robot.robot_id} is DEAD — cell [${robot.position}] is now an obstacle`, "critical");
       if (this.tmId === robot.robot_id) this._forceElection("TM battery dead");
-    } else if (robot.battery_state === BATTERY_STATE.CRITICAL && robot.status !== STATUS.CHARGING && robot._task) {
-      this._releaseTask(robot, "battery critical");
+    } else if (robot.battery_state === BATTERY_STATE.CRITICAL && robot.status !== STATUS.CHARGING) {
+      // CRITICAL: refuse/return any current task, then route to nearest charging point
+      if (robot._task) this._releaseTask(robot, "battery critical");
+      const ch = this._nearestCharging(robot.position);
+      if (ch) {
+        this._planTo(robot, ch);
+        robot.status = STATUS.CHARGING;
+        robot._chargingTarget = ch;
+        this._log("Battery", `${robot.robot_id} CRITICAL — routing to charging point [${ch}]`, "critical");
+      }
+    } else if (
+      robot.battery_state === BATTERY_STATE.LOW &&
+      !robot._task &&
+      robot.status !== STATUS.CHARGING
+    ) {
+      // LOW + idle: opportunistically top up before it becomes critical far from a charger
       const ch = this._nearestCharging(robot.position);
       if (ch) {
         this._planTo(robot, ch);
@@ -680,8 +696,22 @@ export class SimulationEngine {
   _nearestCharging(pos) {
     const ch = this.warehouse.zones.charging;
     if (!ch.length) return null;
+    // charging cells already occupied or already targeted by another robot
+    const taken = new Set();
+    for (const r of this.robots) {
+      if (!r.alive) continue;
+      if (r.status === STATUS.CHARGING && r._chargingTarget) taken.add(key(r._chargingTarget));
+      if (ch.some((c) => c[0] === r.position[0] && c[1] === r.position[1])) taken.add(key(r.position));
+    }
     let best = null;
     let bestD = Infinity;
+    for (const c of ch) {
+      if (taken.has(key(c))) continue;
+      const d = manhattan(pos, c);
+      if (d < bestD) ((bestD = d), (best = c));
+    }
+    if (best) return best;
+    // fallback: nearest even if contended (better than nothing)
     for (const c of ch) {
       const d = manhattan(pos, c);
       if (d < bestD) ((bestD = d), (best = c));
@@ -802,7 +832,7 @@ export class SimulationEngine {
           const s = robotById(id);
           return { robot_id: id, current_task: s.current_task, reservationTick: s.reservationTick };
         });
-        const winner = resolvePriority(cands, this.tick);
+        const winner = this._pickWinner(cands);
         for (const id of ids) {
           if (id !== winner && intents.has(id)) {
             intents.delete(id);
@@ -827,7 +857,7 @@ export class SimulationEngine {
               { robot_id: id, current_task: robotById(id).current_task, reservationTick: robotById(id).reservationTick },
               { robot_id: occ, current_task: robotById(occ).current_task, reservationTick: robotById(occ).reservationTick },
             ];
-            const winner = resolvePriority(cands, this.tick);
+            const winner = this._pickWinner(cands);
             const loser = winner === id ? occ : id;
             if (intents.has(loser)) {
               intents.delete(loser);
@@ -847,6 +877,10 @@ export class SimulationEngine {
     // waiting on a cell occupied by another waiting robot)
     this._detectDeadlock(desired, intents, occupancy);
 
+    // remember which pairs are in conflict this tick so the SAME standoff is not
+    // recounted next tick (episode-based counting)
+    this._activeCollisions = yieldedPairs;
+
     // apply moves
     for (const r of this.robots) {
       if (!r.alive) continue;
@@ -855,12 +889,13 @@ export class SimulationEngine {
         r.velocity = [next[0] - r.position[0], next[1] - r.position[1]];
         r.position = [...next];
         r.pathIndex += 1;
-        r.battery -= CONFIG.MOVE_BATTERY_COST;
+        r.battery -= r.status === STATUS.CHARGING ? 0.05 : CONFIG.MOVE_BATTERY_COST;
         r._stuck = 0;
         if (r.status !== STATUS.CHARGING) r.status = STATUS.MOVING;
       } else if (r._task || r.status === STATUS.CHARGING) {
         r.velocity = [0, 0];
-        r.battery -= CONFIG.WAIT_BATTERY_COST;
+        // a robot committed to charging must not die from waiting in an approach queue
+        r.battery -= r.status === STATUS.CHARGING ? 0 : CONFIG.WAIT_BATTERY_COST;
         r._stuck = (r._stuck || 0) + 1;
         if (r.status === STATUS.MOVING || r.status === STATUS.REROUTING) r.status = STATUS.WAITING;
       } else {
@@ -871,15 +906,28 @@ export class SimulationEngine {
     }
   }
 
+  // Winner selection. System uses the shared task-priority rule; the naive
+  // stop-and-wait baseline uses NO task priority (deterministic lowest-id only).
+  _pickWinner(cands) {
+    if (this.mode === "baseline") {
+      return [...cands].sort((a, b) =>
+        a.robot_id.localeCompare(b.robot_id, undefined, { numeric: true })
+      )[0].robot_id;
+    }
+    return resolvePriority(cands, this.tick);
+  }
+
   _recordCollision(loser, winner, ttc, resolution, seen) {
     if (!loser || !winner) return;
-    if (this.mode === "baseline") loser._baselineHold = 1;
+    if (this.mode === "baseline") loser._baselineHold = 2; // naive extra wait
     const pk = [loser.robot_id, winner.robot_id].sort().join("|");
     if (seen.has(pk)) return;
     seen.add(pk);
+    this.tickIndicators.collision = true; // pulse every active tick
+    // count one EPISODE: only when this pair was NOT already in conflict last tick
+    if (this._activeCollisions.has(pk)) return;
     this.metrics.collisionsAvoided += 1;
     this.indicators.collision += 1;
-    this.tickIndicators.collision = true;
     this._emit("Collision", { robot_a: loser.robot_id, robot_b: winner.robot_id, ttc: ttc === Infinity ? null : Number(ttc.toFixed(1)), resolution });
     this._log(
       "Collision Avoidance",
@@ -889,6 +937,7 @@ export class SimulationEngine {
   }
 
   _detectDeadlock(desired, intents, occupancy) {
+    this._deadlockThisTick = new Set();
     // wait-for edges: r -> occupant of desired[r], only for robots that did not get to move
     const waitFor = new Map();
     for (const [id, cell] of desired) {
@@ -917,23 +966,32 @@ export class SimulationEngine {
       }
       for (const n of stack) visited.add(n);
     }
+    // episode-based: only cycles genuinely new this tick stay counted next tick
+    this._activeDeadlocks = this._deadlockThisTick;
   }
 
   _resolveDeadlock(cycle) {
     if (cycle.length < 2) return;
-    this.metrics.deadlocksResolved += 1;
-    this.indicators.deadlock += 1;
+    const cycleKey = [...cycle].sort().join("|");
+    this._deadlockThisTick.add(cycleKey);
+    const isNew = !this._activeDeadlocks.has(cycleKey);
+    if (isNew) {
+      this.metrics.deadlocksResolved += 1;
+      this.indicators.deadlock += 1;
+    }
     this.tickIndicators.deadlock = true;
     // lowest priority robot in cycle steps aside (reroute-vs-reallocate: reroute wins)
     const cands = cycle.map((id) => {
       const s = this.robots.find((r) => r.robot_id === id);
       return { robot_id: id, current_task: s.current_task, reservationTick: s.reservationTick };
     });
-    const winner = resolvePriority(cands, this.tick);
+    const winner = this._pickWinner(cands);
     const loserId = cycle.find((id) => id !== winner) || cycle[cycle.length - 1];
     const loser = this.robots.find((r) => r.robot_id === loserId);
-    this._emit("Deadlock", { robot_ids: cycle, cycle, resolution: `${loserId} steps aside` });
-    this._log("Deadlock Resolution", `Cycle [${cycle.join(" → ")}] detected — ${loserId} steps aside & reroutes`, "deadlock");
+    if (isNew) {
+      this._emit("Deadlock", { robot_ids: cycle, cycle, resolution: `${loserId} steps aside` });
+      this._log("Deadlock Resolution", `Cycle [${cycle.join(" → ")}] detected — ${loserId} steps aside & reroutes`, "deadlock");
+    }
 
     if (loser) {
       // step aside to a free neighbor, then replan
@@ -1101,6 +1159,18 @@ export class SimulationEngine {
     return this.getSnapshot();
   }
 
+  // Next target cell + kind, for dashboard highlighting.
+  _robotTarget(r) {
+    if (!r.alive) return null;
+    if (r.status === STATUS.CHARGING && r._chargingTarget)
+      return { cell: [...r._chargingTarget], kind: "charging" };
+    if (r._task) {
+      const goal = r._task.phase === "to_pickup" ? r._task.pickup : r._task.dropoff;
+      return { cell: [...goal], kind: r._task.phase === "to_pickup" ? "pickup" : "dropoff" };
+    }
+    return null;
+  }
+
   // ─── Snapshot for UI ───────────────────────────────────────────────────
   getSnapshot() {
     const avgBattery = this.robots.length
@@ -1129,6 +1199,7 @@ export class SimulationEngine {
         alive: r.alive,
         current_task: r.current_task ? { ...r.current_task } : null,
         planned_path: r.planned_path.slice(r.pathIndex),
+        target: this._robotTarget(r),
       })),
       tasks: {
         pending: this._unassignedTasks().length,

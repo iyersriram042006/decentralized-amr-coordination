@@ -147,6 +147,53 @@ export default function GridView({
 
       {pathDots}
 
+      {/* next-target highlights */}
+      {robots.map((r) => {
+        if (!r.alive || !r.target) return null;
+        if (selectedRobot && selectedRobot !== r.robot_id) return null;
+        const kindColor =
+          r.target.kind === "pickup" ? "#00E5FF" : r.target.kind === "dropoff" ? "#39FF14" : "#39FF14";
+        const [tx, ty] = r.target.cell;
+        return (
+          <div
+            key={r.robot_id + "-tgt"}
+            data-testid={`target-${r.robot_id}`}
+            style={{
+              position: "absolute",
+              left: `${((tx + 0.5) / width) * 100}%`,
+              top: `${((ty + 0.5) / height) * 100}%`,
+              width: `min(4vw, 30px)`,
+              height: `min(4vw, 30px)`,
+              minWidth: 14,
+              minHeight: 14,
+              transform: "translate(-50%,-50%)",
+              zIndex: 15,
+              pointerEvents: "none",
+            }}
+          >
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                border: `1.5px solid ${kindColor}`,
+                borderRadius: r.target.kind === "charging" ? "50%" : 2,
+                boxShadow: `0 0 10px -1px ${kindColor}`,
+                animation: "blink 1.4s step-end infinite",
+              }}
+            />
+            <div
+              style={{
+                position: "absolute",
+                inset: "34%",
+                background: kindColor,
+                opacity: 0.85,
+                borderRadius: r.target.kind === "charging" ? "50%" : 1,
+              }}
+            />
+          </div>
+        );
+      })}
+
       {robots.map((r) => {
         const color = STATUS_COLOR[r.status] || "#4B5563";
         const batteryColor = BATTERY_COLOR[r.battery_state] || "#39FF14";

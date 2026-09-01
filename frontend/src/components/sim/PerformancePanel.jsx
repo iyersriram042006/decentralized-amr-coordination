@@ -21,17 +21,21 @@ export default function PerformancePanel({ seed = 42 }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [trials, setTrials] = useState(15);
+  const [lastSeed, setLastSeed] = useState(null);
 
   const run = () => {
     setLoading(true);
     setResult(null);
+    // fresh random seed each run so the measured value varies run-to-run
+    const runSeed = Math.floor(Math.random() * 1_000_000);
+    setLastSeed(runSeed);
     setTimeout(async () => {
-      const res = SimulationEngine.runComparison(seed, trials, 10);
+      const res = SimulationEngine.runComparison(runSeed, trials, 10);
       setResult(res);
       setLoading(false);
       try {
         await axios.post(`${API}/sim-runs`, {
-          seed,
+          seed: runSeed,
           trials: res.trials,
           task_count: res.taskCount,
           baseline_avg: res.baseline_avg,
@@ -80,7 +84,7 @@ export default function PerformancePanel({ seed = 42 }) {
             {loading ? "Running…" : "Run Comparison"}
           </button>
           <span className="font-mono text-[9px] text-[#4B5563] flex-1">
-            10 identical tasks · same seed · measured, not forced
+            10 identical tasks · {lastSeed !== null ? `seed ${lastSeed}` : "fresh seed each run"} · measured, not forced
           </span>
         </div>
 

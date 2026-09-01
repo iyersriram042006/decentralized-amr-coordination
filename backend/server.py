@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
-from pydantic import BaseModel, Field, ConfigDict, EmailStr
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List
 import uuid
 from datetime import datetime, timezone
@@ -29,7 +29,7 @@ api_router = APIRouter(prefix="/api")
 # Define Models
 class DemoRequestCreate(BaseModel):
     name: str
-    email: EmailStr
+    email: str
     org: str = ""
     message: str = ""
 

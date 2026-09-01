@@ -32,7 +32,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 bg-[#00E5FF] box-glow-cyan" />
             <span className="font-display text-sm uppercase tracking-widest font-bold">
-              AMR<span className="text-[#00E5FF]">·</span>FLEET Control
+              Grid<span className="text-[#00E5FF]">Lock</span>
             </span>
           </div>
           <span className="font-mono text-[10px] text-[#4B5563] hidden md:block">

@@ -51,7 +51,7 @@ function Nav() {
         <div className="flex items-center gap-2">
           <div className="w-2.5 h-2.5 bg-[#00E5FF] box-glow-cyan" />
           <span className="font-display text-sm uppercase tracking-widest font-bold">
-            AMR<span className="text-[#00E5FF]">·</span>FLEET
+            Grid<span className="text-[#00E5FF]">Lock</span>
           </span>
         </div>
         <span className="font-mono text-[10px] text-[#4B5563] hidden md:block">SIH 26123 / BEL</span>
@@ -514,7 +514,7 @@ function Footer() {
       <div className="max-w-7xl mx-auto px-5 py-8 flex flex-col md:flex-row items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 bg-[#00E5FF]" />
-          <span className="font-display text-xs uppercase tracking-widest">AMR·FLEET</span>
+          <span className="font-display text-xs uppercase tracking-widest">GridLock</span>
         </div>
         <span className="font-mono text-[10px] text-[#4B5563]">
           SIH Problem Statement 26123 · Bharat Electronics Limited · Smart Automation
